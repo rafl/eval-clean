@@ -32,4 +32,15 @@ is_deeply(
     is $global, 123, 'state is preserved between perls';
 }
 
+{
+    my $cv = $perl->eval('sub { 42 }');
+    is $cv->(), 42, 'coderefs work';
+}
+
+{
+    my $cv = $perl->eval('my $foo = 42; sub { $foo++ }');
+    is $cv->(), 42, 'closures work';
+    is $cv->(), 43, 'closures keep their state';
+}
+
 done_testing;
