@@ -3,6 +3,7 @@ package Eval::Clean;
 use strict;
 use warnings;
 use XSLoader;
+use XS::Object::Magic;
 
 XSLoader::load(
     __PACKAGE__,

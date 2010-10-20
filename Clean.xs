@@ -1,8 +1,13 @@
 #include "EXTERN.h"
 #include "perl.h"
+#define NO_XSLOCKS
 #include "XSUB.h"
 
-static PerlInterpreter *main_perl;
+#include "xs_object_magic.h"
+
+#define SET_PERL(perl)  PERL_SET_CONTEXT(perl);
+#define GET_PERL        PERL_GET_CONTEXT
+
 char *default_args[] =  { "a_perl", "-e", "0" };
 
 static void xs_init (pTHX);
@@ -15,94 +20,87 @@ EXTERN_C void xs_init(pTHX) {
   newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
+static PerlInterpreter *
+new_perl (void)
+{
+    PerlInterpreter *perl, *prev = GET_PERL;
+
+    PL_perl_destruct_level = 1;
+    perl = perl_alloc();
+
+    SET_PERL(perl);
+    perl_construct(perl);
+    perl_parse(perl, xs_init, (sizeof(default_args) / sizeof(default_args[0])),
+               default_args, (char **)NULL);
+    SET_PERL(prev);
+
+    return perl;
+}
+
+static void
+free_perl (PerlInterpreter *perl)
+{
+    PL_perl_destruct_level = 1;
+    perl_destruct(perl);
+    perl_free(perl);
+}
+
+static SV *
+eval (PerlInterpreter *perl, const char *code)
+{
+    PerlInterpreter *prev = GET_PERL;
+    SV *ret, *cloned;
+    CLONE_PARAMS clone_params;
+
+    SET_PERL(perl);
+    ret = eval_pv(code, TRUE);
+    SET_PERL(prev);
+
+    clone_params.flags = 0;
+    clone_params.unreferenced = newAV();
+    PL_ptr_table = ptr_table_new();
+
+    cloned = SvREFCNT_inc(sv_dup(ret, &clone_params));
+
+    SvREFCNT_dec(clone_params.unreferenced);
+    ptr_table_free(PL_ptr_table);
+    PL_ptr_table = NULL;
+
+    return cloned;
+}
+
 MODULE = Eval::Clean   PACKAGE = Eval::Clean
 
 PROTOTYPES: DISABLE
 
-BOOT:
-        main_perl = PERL_GET_CONTEXT;
-
 PerlInterpreter *
-new_perl()
-  CODE:
-    PerlInterpreter *perl;
+new_perl ()
 
-    perl = perl_alloc();
+MODULE = Eval::Clean   PACKAGE = Eval::Clean::Perl
 
-    my_perl = perl;
-    PERL_SET_CONTEXT(my_perl);
+PROTOTYPES: DISABLE
 
-    perl_construct(perl);
-    perl_parse(perl, xs_init, 3, default_args, (char **)NULL);
+SV *
+eval (perl, code)
+        PerlInterpreter *perl
+        const char *code
+    PREINIT:
+        dXCPT;
+        PerlInterpreter *prev = GET_PERL;
+    CODE:
+        /* doesn't work. exception gets thrown in the other perl */
+        XCPT_TRY_START {
+            RETVAL = eval(perl, code);
+        } XCPT_TRY_END
 
-    my_perl = main_perl;
-    PERL_SET_CONTEXT(main_perl);
-
-    RETVAL = perl;
-
-  OUTPUT:
-    RETVAL
+        XCPT_CATCH {
+            SET_PERL(prev);
+        }
+    OUTPUT:
+        RETVAL
 
 void
-free_perl(PerlInterpreter *perl)
-  CODE:
-    perl_destruct(perl);
-    perl_free(perl);
-
-const char *
-eval(PerlInterpreter *code_perl, const char *code, const char *after_code)
-  CODE:
-    PerlInterpreter *after_perl;
-    SV *code_result, *after_cv, *after_result;
-    int count = 0;
-
-    after_perl = perl_alloc();
-    perl_construct(after_perl);
-
-    my_perl = code_perl;
-    PERL_SET_CONTEXT(code_perl);
-
-    //printf("Running '%s'...\n", code);
-    code_result = eval_pv(code, TRUE);
-    //printf("got SV at %#x (%s)\n", code_result, SvPV_nolen(code_result));
-
-    after_perl = perl_clone(code_perl, 0);
-    //printf("oh hai, we have a new perl at %#x (old: %#x)\n", after_perl, code_perl);
-
-    my_perl = after_perl;
-    PERL_SET_CONTEXT(after_perl);
-
-    //printf("Running '%s'...\n", after_code);
-    after_cv = eval_pv(after_code, TRUE);
-    //printf("got SV at %#x\n", after_result);
-
-    dSP;
-
-    ENTER;
-    SAVETMPS;
-
-    PUSHMARK(SP);
-    XPUSHs(code_result);
-    PUTBACK;
-
-    count = call_sv(after_cv, G_SCALAR);
-
-    if(count != 1)
-      croak("Something bad happened; expecting 1 value but got %d", count);
-
-    SPAGAIN;
-    after_result = POPs;
-    RETVAL = strdup(SvPV_nolen(after_result));
-
-    PUTBACK;
-    FREETMPS;
-    LEAVE;
-
-    perl_destruct(after_perl);
-    perl_free(after_perl);
-
-    my_perl = main_perl;
-    PERL_SET_CONTEXT(main_perl);
-
-  OUTPUT:
-    RETVAL
+DESTROY (perl)
+        PerlInterpreter *perl
+    CODE:
+        free_perl(perl);

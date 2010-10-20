@@ -1,1 +1,9 @@
-PerlInterpreter * T_PTROBJ
+PerlInterpreter * T_PTROBJ_MG
+
+OUTPUT
+
+T_PTROBJ_MG
+     SV *sv = newSV(0);
+     $arg = newRV_noinc(sv);
+     sv_bless($arg, gv_stashpvs("Eval::Clean::Perl", 0));
+     xs_object_magic_attach_struct(aTHX_ sv, $var);
