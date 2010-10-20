@@ -57,12 +57,16 @@ eval (PerlInterpreter *perl, const char *code)
     SET_PERL(prev);
 
     clone_params.flags = 0;
+#if PERL_VERSION >= 13 && PERL_SUBVERSION >= 2
     clone_params.unreferenced = newAV();
+#endif
     PL_ptr_table = ptr_table_new();
 
     cloned = SvREFCNT_inc(sv_dup(ret, &clone_params));
 
+#if PERL_VERSION >= 13 && PERL_SUBVERSION >= 2
     SvREFCNT_dec(clone_params.unreferenced);
+#endif
     ptr_table_free(PL_ptr_table);
     PL_ptr_table = NULL;
 
