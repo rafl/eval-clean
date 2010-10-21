@@ -50,9 +50,16 @@ eval (PerlInterpreter *perl, const char *code)
 {
     PerlInterpreter *prev = GET_PERL;
     SV *ret, *cloned;
+    int xcpt = 0;
 
     SET_PERL(perl);
-    ret = eval_pv(code, TRUE);
+    ret = eval_pv(code, FALSE);
+
+    if (SvTRUE(ERRSV)) {
+        xcpt = 1;
+        ret = ERRSV;
+    }
+
     SET_PERL(prev);
 
 #if (PERL_VERSION < 13) || (PERL_VERSION == 13 && PERL_SUBVERSION <= 1)
@@ -88,6 +95,8 @@ eval (PerlInterpreter *perl, const char *code)
     }
 #endif
 
+    if (xcpt)
+        croak_sv(cloned);
 
     return cloned;
 }
@@ -112,13 +121,7 @@ eval (perl, code)
         PerlInterpreter *prev = GET_PERL;
     CODE:
         /* doesn't work. exception gets thrown in the other perl */
-        XCPT_TRY_START {
-            RETVAL = eval(perl, code);
-        } XCPT_TRY_END
-
-        XCPT_CATCH {
-            SET_PERL(prev);
-        }
+        RETVAL = eval(perl, code);
     OUTPUT:
         RETVAL
 
