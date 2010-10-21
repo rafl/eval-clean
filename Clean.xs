@@ -50,29 +50,44 @@ eval (PerlInterpreter *perl, const char *code)
 {
     PerlInterpreter *prev = GET_PERL;
     SV *ret, *cloned;
-    CLONE_PARAMS clone_params;
 
     SET_PERL(perl);
     ret = eval_pv(code, TRUE);
     SET_PERL(prev);
 
-    clone_params.flags = CLONEf_JOIN_IN;
-    clone_params.stashes = newAV();
-#if PERL_VERSION >= 13 && PERL_SUBVERSION >= 2
-    clone_params.unreferenced = newAV();
-#endif
-    PL_ptr_table = ptr_table_new();
-    ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
-    ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
-    ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
+#if (PERL_VERSION < 13) || (PERL_VERSION == 13 && PERL_SUBVERSION <= 1)
+    {
+        CLONE_PARAMS clone_params;
 
-    cloned = SvREFCNT_inc(sv_dup(ret, &clone_params));
+        clone_params.stashes = newAV();
+        clone_params.flags = CLONEf_JOIN_IN;
+        PL_ptr_table = ptr_table_new();
+        ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
+        ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
+        ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
+        cloned = SvREFCNT_inc(sv_dup(ret, &clone_params));
+        SvREFCNT_dec(clone_params.stashes);
+        SvREFCNT_inc_void(cloned);
+        ptr_table_free(PL_ptr_table);
+        PL_ptr_table = NULL;
+    }
+#else
+    {
+        CLONE_PARAMS *clone_params = Perl_clone_params_new(perl, aTHX);
 
-#if PERL_VERSION >= 13 && PERL_SUBVERSION >= 2
-    SvREFCNT_dec(clone_params.unreferenced);
+        clone_params->flags |= CLONEf_JOIN_IN;
+        PL_ptr_table = ptr_table_new();
+        ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
+        ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
+        ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
+        cloned = SvREFCNT_inc(sv_dup(ret, clone_params));
+        Perl_clone_params_del(clone_params);
+        SvREFCNT_inc_void(cloned);
+        ptr_table_free(PL_ptr_table);
+        PL_ptr_table = NULL;
+    }
 #endif
-    ptr_table_free(PL_ptr_table);
-    PL_ptr_table = NULL;
+
 
     return cloned;
 }
