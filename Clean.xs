@@ -95,8 +95,14 @@ eval (PerlInterpreter *perl, const char *code)
     }
 #endif
 
-    if (xcpt)
+    if (xcpt) {
+#ifdef croak_sv
         croak_sv(cloned);
+#else
+        ERRSV = cloned;
+        croak(NULL);
+#endif
+    }
 
     return cloned;
 }
