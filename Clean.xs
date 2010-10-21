@@ -65,7 +65,7 @@ eval (PerlInterpreter *perl, const char *code)
         ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
         ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
         ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
-        cloned = SvREFCNT_inc(sv_dup(ret, &clone_params));
+        cloned = sv_dup(ret, &clone_params);
         SvREFCNT_dec(clone_params.stashes);
         SvREFCNT_inc_void(cloned);
         ptr_table_free(PL_ptr_table);
@@ -80,7 +80,7 @@ eval (PerlInterpreter *perl, const char *code)
         ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
         ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
         ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
-        cloned = SvREFCNT_inc(sv_dup(ret, clone_params));
+        cloned = sv_dup(ret, clone_params);
         Perl_clone_params_del(clone_params);
         SvREFCNT_inc_void(cloned);
         ptr_table_free(PL_ptr_table);
