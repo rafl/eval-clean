@@ -116,9 +116,6 @@ SV *
 eval (perl, code)
         PerlInterpreter *perl
         const char *code
-    PREINIT:
-        dXCPT;
-        PerlInterpreter *prev = GET_PERL;
     CODE:
         /* doesn't work. exception gets thrown in the other perl */
         RETVAL = eval(perl, code);
