@@ -25,7 +25,6 @@ new_perl (void)
 {
     PerlInterpreter *perl, *prev = GET_PERL;
 
-    PL_perl_destruct_level = 1;
     perl = perl_alloc();
 
     SET_PERL(perl);
@@ -40,7 +39,6 @@ new_perl (void)
 static void
 free_perl (PerlInterpreter *perl)
 {
-    PL_perl_destruct_level = 1;
     perl_destruct(perl);
     perl_free(perl);
 }
