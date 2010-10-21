@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Test::Exception;
 
 use Eval::Clean;
 
@@ -38,9 +39,22 @@ is_deeply(
 }
 
 {
-    my $cv = $perl->eval('my $foo = 42; sub { $foo++ }');
+    my $cv = $perl->eval('my $foo = 42; our $OTHER_GLOBAL = sub { $foo++ }');
     is $cv->(), 42, 'closures work';
     is $cv->(), 43, 'closures keep their state';
+
+    $cv = $perl->eval('$OTHER_GLOBAL');
+    is $cv->(), 42, "running closures from the cage doesn't change the cage";
+}
+
+{
+    throws_ok sub {
+        $perl->eval('BEGIN { die "foo" }');
+    }, qr/\bfoo\b/, 'compile-time exceptions propagated from the cage';
+
+    throws_ok sub {
+        $perl->eval('die "foo"');
+    }, qr/\bfoo\b/, 'run-time exceptions propagated from the cage';
 }
 
 done_testing;
