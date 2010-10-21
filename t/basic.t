@@ -55,6 +55,17 @@ is_deeply(
     throws_ok sub {
         $perl->eval('die "foo"');
     }, qr/\bfoo\b/, 'run-time exceptions propagated from the cage';
+
+    eval {
+        $perl->eval('die { foo => q[bar] }');
+    };
+
+    my $err = $@;
+    is_deeply(
+        $err,
+        { foo => 'bar' },
+        'structured expections work too',
+    );
 }
 
 done_testing;
