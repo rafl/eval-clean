@@ -39,8 +39,12 @@ new_perl (void)
 static void
 free_perl (PerlInterpreter *perl)
 {
+    PerlInterpreter *prev = GET_PERL;
+
+    SET_PERL(perl);
     perl_destruct(perl);
     perl_free(perl);
+    SET_PERL(prev);
 }
 
 static SV *
