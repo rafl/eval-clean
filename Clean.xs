@@ -58,6 +58,18 @@ eval (PerlInterpreter *perl, const char *code)
         ret = ERRSV;
     }
 
+    /* Some closures can reference the main program as their OUTSIDE. Cloning
+     * that doesn't quite do what we'd want it to. Therefore we just toggle some
+     * of its bits so things only go wrong during global destruction, not during
+     * normal garbage collection on LEAVE. The proper fix for this is probably
+     * to remove the cloning main_root limitations from the core. */
+    if (SvROK(ret) && SvTYPE(SvRV(ret)) == SVt_PVCV) {
+        CV *outside = CvOUTSIDE(SvRV(ret));
+
+        if (outside && SvTEMP(outside) && CvUNIQUE(outside) && !SvFAKE(outside))
+            SvTEMP_off(outside);
+    }
+
     SET_PERL(prev);
 
 #if (PERL_VERSION < 13) || (PERL_VERSION == 13 && PERL_SUBVERSION <= 1)
