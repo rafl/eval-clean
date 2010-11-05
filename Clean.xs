@@ -141,7 +141,6 @@ eval (perl, code)
         PerlInterpreter *perl
         const char *code
     CODE:
-        /* doesn't work. exception gets thrown in the other perl */
         RETVAL = eval(perl, code);
     OUTPUT:
         RETVAL
