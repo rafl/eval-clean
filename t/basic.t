@@ -19,7 +19,7 @@ is_deeply(
 );
 
 {
-    my $libs = $perl->eval("use strict; \\%INC");
+    my $libs = $perl->eval("use strict; \\\%INC");
     is_deeply(
         [keys %{ $libs }],
         ['strict.pm'],
@@ -30,7 +30,7 @@ is_deeply(
 {
     $perl->eval('package main; our $GLOBAL = 123;');
     my $global = $perl->eval('$GLOBAL');
-    is $global, 123, 'state is preserved between perls';
+    is $global, 123, 'state is preserved between evals';
 }
 
 {
@@ -64,7 +64,7 @@ is_deeply(
     is_deeply(
         $err,
         { foo => 'bar' },
-        'structured expections work too',
+        'structured exceptions work too',
     );
 }
 
