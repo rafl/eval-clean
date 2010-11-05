@@ -126,7 +126,11 @@ MODULE = Eval::Clean   PACKAGE = Eval::Clean
 PROTOTYPES: DISABLE
 
 PerlInterpreter *
-new_perl ()
+new (class)
+    CODE:
+        RETVAL = new_perl();
+    OUTPUT:
+        RETVAL
 
 MODULE = Eval::Clean   PACKAGE = Eval::Clean::Perl
 

@@ -5,7 +5,7 @@ use Test::Exception;
 
 use Eval::Clean;
 
-my $perl = Eval::Clean::new_perl();
+my $perl = Eval::Clean->new;
 isa_ok($perl, 'Eval::Clean::Perl');
 
 my $result = $perl->eval(
