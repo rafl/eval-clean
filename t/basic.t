@@ -47,6 +47,24 @@ is_deeply(
     is $cv->(), 42, "running closures from the cage doesn't change the cage";
 }
 
+TODO: {
+    todo_skip "PL_main_root fixup isn't recursive yet", 2;
+
+    my $cv = $perl->eval(<<'EOC');
+my $foo = 42;
+my $bar = sub {
+    my $baz = 23;
+    sub {
+        $baz++ if $foo++ % 2;
+        $foo;
+    }
+};
+$bar->();
+EOC
+    is $cv->(), 43, 'closures work';
+    is $cv->(), 44, 'closures keep their state';
+}
+
 {
     throws_ok sub {
         $perl->eval('BEGIN { die "foo" }');

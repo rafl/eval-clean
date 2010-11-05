@@ -57,7 +57,11 @@ clone_scalar (SV *sv, PerlInterpreter *from, PerlInterpreter *to)
      * that doesn't quite do what we'd want it to. Therefore we just fiddle its
      * bits until things won't fail anymore during normal garbage collection on
      * LEAVE. This probably leaks tho. The proper fix for this is probably to
-     * remove the cloning main_root limitations from the core. */
+     * remove the cloning main_root limitations from the core.
+     *
+     * This really needs to walk `sv' recursively, even through pads, and treat
+     * every CV it runs into. Data::Visitor doesn't easily do that right now, so
+     * here's the easy and buggy version. */
     if (SvROK(sv) && SvTYPE(SvRV(sv)) == SVt_PVCV) {
         CV *outside = CvOUTSIDE(SvRV(sv));
 
