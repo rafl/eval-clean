@@ -48,33 +48,24 @@ free_perl (PerlInterpreter *perl)
 }
 
 static SV *
-eval (PerlInterpreter *perl, const char *code)
+clone_scalar (SV *sv, PerlInterpreter *from, PerlInterpreter *to)
 {
+    SV *ret;
     PerlInterpreter *prev = GET_PERL;
-    SV *ret, *cloned;
-    int xcpt = 0;
-
-    SET_PERL(perl);
-    ret = eval_pv(code, FALSE);
-
-    if (SvTRUE(ERRSV)) {
-        xcpt = 1;
-        ret = ERRSV;
-    }
 
     /* Some closures can reference the main program as their OUTSIDE. Cloning
      * that doesn't quite do what we'd want it to. Therefore we just toggle some
      * of its bits so things only go wrong during global destruction, not during
      * normal garbage collection on LEAVE. The proper fix for this is probably
      * to remove the cloning main_root limitations from the core. */
-    if (SvROK(ret) && SvTYPE(SvRV(ret)) == SVt_PVCV) {
-        CV *outside = CvOUTSIDE(SvRV(ret));
+    if (SvROK(sv) && SvTYPE(SvRV(sv)) == SVt_PVCV) {
+        CV *outside = CvOUTSIDE(SvRV(sv));
 
         if (outside && SvTEMP(outside) && CvUNIQUE(outside) && !SvFAKE(outside))
             SvTEMP_off(outside);
     }
 
-    SET_PERL(prev);
+    SET_PERL(to);
 
 #if (PERL_VERSION < 13) || (PERL_VERSION == 13 && PERL_SUBVERSION <= 1)
     {
@@ -83,12 +74,12 @@ eval (PerlInterpreter *perl, const char *code)
         clone_params.stashes = newAV();
         clone_params.flags = CLONEf_JOIN_IN;
         PL_ptr_table = ptr_table_new();
-        ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
-        ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
-        ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
-        cloned = sv_dup(ret, &clone_params);
+        ptr_table_store(PL_ptr_table, &from->Isv_undef, &PL_sv_undef);
+        ptr_table_store(PL_ptr_table, &from->Isv_no, &PL_sv_no);
+        ptr_table_store(PL_ptr_table, &from->Isv_yes, &PL_sv_yes);
+        ret = sv_dup(sv, &clone_params);
         SvREFCNT_dec(clone_params.stashes);
-        SvREFCNT_inc_void(cloned);
+        SvREFCNT_inc_void(ret);
         ptr_table_free(PL_ptr_table);
         PL_ptr_table = NULL;
     }
@@ -98,27 +89,47 @@ eval (PerlInterpreter *perl, const char *code)
 
         clone_params->flags |= CLONEf_JOIN_IN;
         PL_ptr_table = ptr_table_new();
-        ptr_table_store(PL_ptr_table, &perl->Isv_undef, &PL_sv_undef);
-        ptr_table_store(PL_ptr_table, &perl->Isv_no, &PL_sv_no);
-        ptr_table_store(PL_ptr_table, &perl->Isv_yes, &PL_sv_yes);
-        cloned = sv_dup(ret, clone_params);
+        ptr_table_store(PL_ptr_table, &from->Isv_undef, &PL_sv_undef);
+        ptr_table_store(PL_ptr_table, &from->Isv_no, &PL_sv_no);
+        ptr_table_store(PL_ptr_table, &from->Isv_yes, &PL_sv_yes);
+        ret = sv_dup(sv, clone_params);
         Perl_clone_params_del(clone_params);
-        SvREFCNT_inc_void(cloned);
+        SvREFCNT_inc_void(ret);
         ptr_table_free(PL_ptr_table);
         PL_ptr_table = NULL;
     }
 #endif
 
-    if (xcpt) {
+    SET_PERL(prev);
+
+    return ret;
+}
+
+static SV *
+eval (PerlInterpreter *perl, const char *code)
+{
+    PerlInterpreter *prev = GET_PERL;
+    SV *ret;
+
+    SET_PERL(perl);
+    ret = eval_pv(code, FALSE);
+    SET_PERL(prev);
+
+#define ERRSVp(p) (GvSVn(p->Ierrgv))
+
+    if (SvTRUE(ERRSVp(perl))) {
+        SV *err = clone_scalar(ERRSVp(perl), perl, prev);
 #ifdef croak_sv
-        croak_sv(cloned);
+        croak_sv(err);
 #else
-        ERRSV = cloned;
+        ERRSV = err;
         croak(NULL);
 #endif
     }
 
-    return cloned;
+#undef ERRSVp
+
+    return clone_scalar(ret, perl, prev);
 }
 
 MODULE = Eval::Clean   PACKAGE = Eval::Clean
