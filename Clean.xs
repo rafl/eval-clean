@@ -89,7 +89,7 @@ clone_scalar (SV *sv, PerlInterpreter *from, PerlInterpreter *to)
     }
 #else
     {
-        CLONE_PARAMS *clone_params = Perl_clone_params_new(perl, aTHX);
+        CLONE_PARAMS *clone_params = Perl_clone_params_new(prev, aTHX);
 
         clone_params->flags |= CLONEf_JOIN_IN;
         PL_ptr_table = ptr_table_new();
